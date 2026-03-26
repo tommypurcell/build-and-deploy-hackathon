@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Vapi from "@vapi-ai/web";
+import { saveNote } from "@/lib/notesStorage";
 
 function buildRepoContextSystemMessage(repoContextJson) {
   return [

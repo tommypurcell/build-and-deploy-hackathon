@@ -69,3 +69,88 @@ body {
     border-color: rgba(255, 255, 255, 0.12);
   }
 }
+
+/* Terminal / HUD panels for Gemini notes */
+.notes-hud {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  background:
+    linear-gradient(180deg, rgba(10, 15, 20, 0.92), rgba(5, 8, 12, 0.96)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(20, 184, 166, 0.04) 0,
+      rgba(20, 184, 166, 0.04) 1px,
+      transparent 1px,
+      transparent 14px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(59, 130, 246, 0.03) 0,
+      rgba(59, 130, 246, 0.03) 1px,
+      transparent 1px,
+      transparent 14px
+    );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 12px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.notes-hud::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.12) 50%,
+    transparent 100%
+  );
+  animation: notes-scan 6s linear infinite;
+  opacity: 0.35;
+}
+
+@keyframes notes-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.notes-stream-wrap {
+  position: relative;
+  max-height: 14rem;
+  overflow: hidden;
+}
+
+.notes-stream-wrap.notes-stream-open {
+  max-height: none;
+}
+
+.notes-stream-fade {
+  pointer-events: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3rem;
+  background: linear-gradient(to top, rgba(5, 8, 12, 0.95), transparent);
+}
+
+.notes-cursor {
+  display: inline-block;
+  width: 0.5rem;
+  margin-left: 1px;
+  animation: notes-blink 0.9s step-end infinite;
+  color: rgba(45, 212, 191, 0.85);
+}
+
+@keyframes notes-blink {
+  50% {
+    opacity: 0;
+  }
+}
