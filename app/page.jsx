@@ -101,7 +101,7 @@ export default function Home() {
             <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
               Add <code className="font-mono">NEXT_PUBLIC_VAPI_PUBLIC_KEY</code> and{" "}
               <code className="font-mono">NEXT_PUBLIC_VAPI_ASSISTANT_ID</code> to{" "}
-              <code className="font-mono">.env.local</code>, then restart{" "}
+              <code className="font-mono">.env</code>, then restart{" "}
               <code className="font-mono">npm run dev</code>.
             </p>
           )}
