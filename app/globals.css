@@ -156,3 +156,12 @@ body {
     opacity: 0;
   }
 }
+
+/* Fenced code without a language class: reset inline <code> chip styles inside <pre> */
+.notes-markdown pre > code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  overflow-wrap: anywhere;
+}

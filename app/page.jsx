@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Vapi from "@vapi-ai/web";
+import { MarkdownNotes } from "@/app/components/MarkdownNotes";
 import { saveNote } from "@/lib/notesStorage";
 
 function buildRepoContextSystemMessage(repoContextJson) {
@@ -317,8 +318,8 @@ export default function Home() {
   return (
     <div className="min-h-full owen-shell text-zinc-900 dark:text-zinc-100">
       <main className="mx-auto flex max-w-lg flex-col items-center px-6 py-16">
-        <div className="owen-banner w-full px-4 py-8 text-center sm:px-6 sm:py-10">
-          <h1 className="pixel-title text-4xl sm:text-5xl md:text-6xl lg:text-7xl">OWEN</h1>
+        <div className="owen-banner w-full px-6 py-10 text-center">
+          <h1 className="pixel-title text-5xl">OWEN</h1>
         </div>
         <p className="mt-3 text-center text-xs text-zinc-600 dark:text-zinc-300">
           Oral Workflow Engine for repo Navigation
@@ -363,7 +364,7 @@ export default function Home() {
         </div>
 
         <div className="mt-6 w-full notes-hud rounded-xl p-5 text-zinc-100">
-          <div className="relative z-[1] flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative z-[1] flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-teal-400/90">
                 OUT // GEMINI_NOTES
@@ -379,10 +380,6 @@ export default function Home() {
               {notesLoading ? "GENERATING…" : "GENERATE_FROM_TRANSCRIPT"}
             </button>
           </div>
-          <p className="relative z-[1] mt-2 font-mono text-[11px] text-zinc-500">
-            Server: <code className="text-zinc-400">GEMINI_API_KEY</code> in{" "}
-            <code className="text-zinc-400">.env</code>
-          </p>
           {notesError ? (
             <p className="relative z-[1] mt-2 rounded border border-red-500/40 bg-red-950/50 p-2 font-mono text-[11px] text-red-200">
               {notesError}
@@ -393,10 +390,14 @@ export default function Home() {
               <div
                 className={`notes-stream-wrap ${notesPreviewExpanded ? "notes-stream-open" : ""}`}
               >
-                <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-teal-50/95">
-                  {notesDisplayText}
-                  {!notesTypingDone ? <span className="notes-cursor">|</span> : null}
-                </pre>
+                {notesTypingDone ? (
+                  <MarkdownNotes markdown={notesFullText} />
+                ) : (
+                  <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-teal-50/95">
+                    {notesDisplayText}
+                    <span className="notes-cursor">|</span>
+                  </pre>
+                )}
                 {!notesPreviewExpanded && notesTypingDone ? (
                   <div className="notes-stream-fade" aria-hidden />
                 ) : null}
@@ -431,11 +432,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <p className="relative z-[1] mt-3 font-mono text-[11px] text-zinc-500">
-              {dialogue.length === 0
-                ? "[ idle ] Speak with OWEN, then generate notes."
-                : "[ ready ] Run generate to stream Markdown notes here."}
-            </p>
+            <div className="relative z-[1] mt-3 font-mono text-[11px] text-zinc-500" />
           )}
         </div>
 

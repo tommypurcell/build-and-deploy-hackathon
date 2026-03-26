@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { MarkdownNotes } from "@/app/components/MarkdownNotes";
 import { loadNote } from "@/lib/notesStorage";
 
 export default function NoteFullPage() {
@@ -68,7 +69,7 @@ export default function NoteFullPage() {
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-teal-400/80">
               OWEN // NOTE_ARCHIVE
             </p>
-            <h1 className="mt-1 pixel-title text-lg sm:text-xl">Full session notes</h1>
+            <h1 className="mt-1 pixel-title text-xl">Full session notes</h1>
             {created ? (
               <p className="mt-1 font-mono text-xs text-zinc-500">{created}</p>
             ) : null}
@@ -84,10 +85,8 @@ export default function NoteFullPage() {
           </Link>
         </div>
 
-        <article className="notes-hud rounded-xl p-6 sm:p-8">
-          <pre className="notes-body whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-zinc-100">
-            {data.markdown}
-          </pre>
+        <article className="notes-hud rounded-xl p-8">
+          <MarkdownNotes markdown={data.markdown} />
         </article>
       </div>
     </div>
