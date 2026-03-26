@@ -31,6 +31,11 @@
       "sourceType": "github",
       "computedHash": "8b3f52f9a80aced790979ca3e781ff242634f1664e7d4996127efd9a048561ca"
     },
+    "gemini-api-dev": {
+      "source": "google-gemini/gemini-skills",
+      "sourceType": "github",
+      "computedHash": "a1bc395530ba9116a4509e27321eaf7cc81c5f93aa80a4778ad6f915180b4f2c"
+    },
     "setup-api-key": {
       "source": "VapiAI/skills",
       "sourceType": "github",
