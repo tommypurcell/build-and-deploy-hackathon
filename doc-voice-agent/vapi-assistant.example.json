@@ -1,0 +1,65 @@
+{
+  "name": "Repo documentation (voice)",
+  "firstMessage": "Hi! Ask me anything about this codebase — I can search and read project files.",
+  "voice": {
+    "provider": "vapi",
+    "voiceId": "Elliot"
+  },
+  "transcriber": {
+    "provider": "deepgram",
+    "model": "nova-3",
+    "language": "en"
+  },
+  "model": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a documentation helper for this software repository. When the user asks how something works or where code lives, call search_repo with a short keyword phrase. If they need details, call read_repo_file with a relative path from search results. Answer in short spoken sentences — no markdown or bullet lists. If a tool errors or finds nothing, explain briefly and suggest different words."
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "search_repo",
+          "description": "Search repository text files for a phrase or keywords.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Search phrase"
+              }
+            },
+            "required": ["query"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR_PUBLIC_BASE_URL/api/vapi/tool"
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "read_repo_file",
+          "description": "Read one text file by path relative to repo root.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Relative path, e.g. doc-voice-agent/app/page.jsx"
+              }
+            },
+            "required": ["path"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR_PUBLIC_BASE_URL/api/vapi/tool"
+        }
+      }
+    ]
+  }
+}

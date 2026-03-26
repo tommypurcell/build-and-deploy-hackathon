@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "skills": {
+    "create-assistant": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "c0f36aa8178f5c4f944abb66d614703b35a4ceab6699d4adb0e3e4d07cdf8ab1"
+    },
+    "create-call": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "6cefb695376bea784998f11f6c3504e331655389cef7b45f958fe9fdc234c206"
+    },
+    "create-phone-number": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "005a4f45be16a34da8f8a6a4b839519607d025e098a571a7a04f08d47511cf65"
+    },
+    "create-squad": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "cffadacd229ad2f055f18efa0399e207a762ff8bb7bcdd4c725706dfb7ce9fa2"
+    },
+    "create-tool": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "d9eab8f419b087f5c6f4357f6d7a24a9bc3503a3cc47d4bc415353c3758d5a24"
+    },
+    "create-workflow": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "8b3f52f9a80aced790979ca3e781ff242634f1664e7d4996127efd9a048561ca"
+    },
+    "setup-api-key": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "ccfab75fb0df94cdf112d997477f9d186b5cf47324cfeb824aa8b9d10a635766"
+    },
+    "setup-webhook": {
+      "source": "VapiAI/skills",
+      "sourceType": "github",
+      "computedHash": "19ed2a7df7a7348fad8a17417f44c2653bc4e54b4b70001c8d17facb8b88aeae"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "bbc31a48537b473ff4feea6360ef0de3bfdcbef26c14f4967a5deefe8ca801d3"
+    }
+  }
+}

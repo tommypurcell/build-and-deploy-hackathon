@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.owen-shell {
+  min-height: 100%;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(20, 184, 166, 0.12), transparent 45%),
+    radial-gradient(circle at 80% 10%, rgba(59, 130, 246, 0.1), transparent 40%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06) 1px, transparent 1px, transparent 24px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06) 1px, transparent 1px, transparent 24px);
+}
+
+/* Title block: same surface as .owen-shell (no separate card) */
+.owen-banner {
+  background: transparent;
+  border: none;
+}
+
+.pixel-title {
+  font-family: var(--font-pixel, var(--font-geist-mono));
+  color: var(--foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  line-height: 1.15;
+  -webkit-font-smoothing: none;
+  text-shadow: none;
+}
+
+.pixel-chip {
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  background: rgba(20, 184, 166, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.08);
+}
+
+.owen-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .owen-card {
+    background: rgba(10, 10, 10, 0.55);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}

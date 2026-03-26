@@ -1,0 +1,14 @@
+# Secrets / environment files
+.env
+.env.*
+
+# Node/build artifacts
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Editor / system
+.DS_Store
+
