@@ -78,6 +78,7 @@ export async function POST(request) {
       "[vapi-tool] toolCallList names:",
       list.map((t) => t?.name).filter(Boolean),
     );
+    console.log("[vapi-tool] Full toolCallList:", JSON.stringify(list, null, 2));
   } catch {
     /* ignore logging */
   }
@@ -87,10 +88,23 @@ export async function POST(request) {
   for (const toolCall of list) {
     const id = toolCall.id;
     const name = toolCall.name;
-    console.log("[vapi-tool] Received tool call:", { id, name, args: toolCall.arguments });
+    const func = toolCall.function; // Vapi might use "function" instead of direct name
+
+    console.log("[vapi-tool] Received tool call:", {
+      id,
+      name,
+      function: func,
+      type: toolCall.type,
+      args: toolCall.arguments,
+      fullToolCall: JSON.stringify(toolCall)
+    });
+
+    // Try to get the actual function name from different possible locations
+    const actualName = name || func?.name || toolCall.type;
+
     try {
-      const result = await handleTool(name, toolCall.arguments, repoOptions);
-      console.log("[vapi-tool] Tool result for", name, ":", result?.substring?.(0, 100) || result);
+      const result = await handleTool(actualName, toolCall.arguments || func?.arguments, repoOptions);
+      console.log("[vapi-tool] Tool result for", actualName, ":", result?.substring?.(0, 100) || result);
       results.push({ toolCallId: id, result });
     } catch (e) {
       const errorMsg = `Error: ${e?.message || String(e)}`;
