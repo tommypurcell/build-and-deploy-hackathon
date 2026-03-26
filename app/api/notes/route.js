@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function buildPrompt({ dialogue, repoUrl }) {
   const lines = (dialogue || [])
@@ -89,8 +89,12 @@ export async function POST(request) {
     return NextResponse.json({ notes: notes.trim() });
   } catch (e) {
     const msg = e?.message || String(e);
+    const hint =
+      /404|no longer available/i.test(msg)
+        ? " Set GEMINI_MODEL in .env to a supported model (see https://ai.google.dev/gemini-api/docs/models)."
+        : "";
     return NextResponse.json(
-      { error: `Gemini request failed: ${msg}` },
+      { error: `Gemini request failed: ${msg}${hint}` },
       { status: 502 },
     );
   }
