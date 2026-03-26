@@ -12,16 +12,18 @@ export default function NoteFullPage() {
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
-    if (!id) {
-      setMissing(true);
-      return;
-    }
-    const item = loadNote(id);
-    if (!item) {
-      setMissing(true);
-      return;
-    }
-    setData(item);
+    queueMicrotask(() => {
+      if (!id) {
+        setMissing(true);
+        return;
+      }
+      const item = loadNote(id);
+      if (!item) {
+        setMissing(true);
+        return;
+      }
+      setData(item);
+    });
   }, [id]);
 
   if (missing) {

@@ -73,6 +73,7 @@ body {
 /* Terminal / HUD panels for Gemini notes */
 .notes-hud {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   border: 1px solid rgba(20, 184, 166, 0.35);
   background:
@@ -101,6 +102,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
   background: linear-gradient(
     180deg,
