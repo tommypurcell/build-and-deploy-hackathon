@@ -3,12 +3,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Vapi from "@vapi-ai/web";
 
+function buildRepoContextSystemMessage(repoContextJson) {
+  return [
+    "You are helping with questions about a GitHub repository.",
+    "Use the repo context JSON below as your primary source of truth for this call.",
+    "If the answer is in the JSON, answer directly and do not ask the user for a keyword first.",
+    "If the answer is missing from the JSON, say that clearly and then ask a focused follow-up question.",
+    "Repo context JSON:",
+    repoContextJson,
+  ].join("\n\n");
+}
+
 export default function Home() {
   const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
   const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
 
   const vapiRef = useRef(null);
+  const pendingContextMessageRef = useRef("");
   const [connected, setConnected] = useState(false);
+  const [loadingContext, setLoadingContext] = useState(false);
   const [log, setLog] = useState([]);
   const [repoUrl, setRepoUrl] = useState("");
 
@@ -28,9 +41,24 @@ export default function Home() {
     const onStart = () => {
       setConnected(true);
       pushLog("Call started - ask about this repo.");
+      if (pendingContextMessageRef.current) {
+        try {
+          vapi.send({
+            type: "add-message",
+            message: {
+              role: "system",
+              content: pendingContextMessageRef.current,
+            },
+          });
+          pushLog("Injected repo context JSON into the call.");
+        } catch (error) {
+          pushLog(`Could not inject repo context: ${error?.message || String(error)}`);
+        }
+      }
     };
     const onEnd = () => {
       setConnected(false);
+      pendingContextMessageRef.current = "";
       pushLog("Call ended.");
     };
     const onMessage = (message) => {
@@ -60,29 +88,78 @@ export default function Home() {
     };
   }, [vapi, pushLog]);
 
-  const toggleCall = useCallback(() => {
+  const fetchRepoContext = useCallback(async () => {
+    const trimmedRepoUrl = repoUrl.trim();
+    const query = trimmedRepoUrl
+      ? `?repoUrl=${encodeURIComponent(trimmedRepoUrl)}`
+      : "";
+
+    const response = await fetch(`/api/repo-context${query}`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      let message = `Repo context request failed with ${response.status}.`;
+      try {
+        const body = await response.json();
+        if (body?.message) {
+          message = body.message;
+        }
+      } catch {
+        /* ignore JSON parse failure */
+      }
+      throw new Error(message);
+    }
+
+    return response.json();
+  }, [repoUrl]);
+
+  const toggleCall = useCallback(async () => {
     if (!vapi || !assistantId) {
       pushLog("Missing NEXT_PUBLIC_VAPI_PUBLIC_KEY or NEXT_PUBLIC_VAPI_ASSISTANT_ID.");
       return;
     }
+
     if (connected) {
-      vapi.stop();
+      await vapi.stop();
       return;
     }
-    if (repoUrl.trim()) {
-      pushLog(`Repo URL: ${repoUrl.trim()}`);
+
+    setLoadingContext(true);
+    pushLog("Loading repo context...");
+
+    try {
+      const payload = await fetchRepoContext();
+      const repoInfo = payload?.repoContext?.repository;
+
+      pendingContextMessageRef.current = buildRepoContextSystemMessage(
+        payload?.repoContextJson || "{}",
+      );
+
+      if (repoInfo?.fullName) {
+        pushLog(`Repo context ready for ${repoInfo.fullName}.`);
+      } else if (repoUrl.trim()) {
+        pushLog(`Repo context ready for ${repoUrl.trim()}.`);
+      } else {
+        pushLog("Repo context ready.");
+      }
+
+      const assistantOverrides = {
+        variableValues: {
+          repoUrl: repoInfo?.url || repoUrl.trim() || "",
+          repoName: repoInfo?.name || "",
+          repoFullName: repoInfo?.fullName || "",
+        },
+      };
+
+      await vapi.start(assistantId, assistantOverrides);
+    } catch (error) {
+      pendingContextMessageRef.current = "";
+      pushLog(`Could not load repo context: ${error?.message || String(error)}`);
+    } finally {
+      setLoadingContext(false);
     }
-
-    // Optional: pass repoUrl into the assistant as a dynamic variable.
-    // In Vapi prompts you can use {{repoUrl}} if you want.
-    const assistantOverrides = {
-      variableValues: {
-        repoUrl: repoUrl.trim() || "",
-      },
-    };
-
-    vapi.start(assistantId, assistantOverrides);
-  }, [vapi, assistantId, connected, pushLog, repoUrl]);
+  }, [vapi, assistantId, connected, pushLog, repoUrl, fetchRepoContext]);
 
   const ready = Boolean(publicKey && assistantId);
 
@@ -115,14 +192,22 @@ export default function Home() {
             placeholder="https://github.com/your/repo"
             className="mt-2 w-full rounded-lg border border-white/30 bg-white/60 px-3 py-2 text-sm text-zinc-900 outline-none ring-0 placeholder:text-zinc-500 focus:border-teal-500 dark:border-white/10 dark:bg-zinc-900/20 dark:text-zinc-100"
           />
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            OWEN loads repo JSON from this URL before the call starts. Leave it blank to use the
+            repo configured in your server env.
+          </p>
 
           <button
             type="button"
             onClick={toggleCall}
-            disabled={!ready}
+            disabled={!ready || loadingContext}
             className="mt-4 w-full rounded-xl bg-teal-600 px-4 py-3 text-center text-sm font-medium text-white shadow-sm transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {connected ? "End voice session" : "Start voice session"}
+            {connected
+              ? "End voice session"
+              : loadingContext
+                ? "Loading repo context..."
+                : "Start voice session"}
           </button>
         </div>
 

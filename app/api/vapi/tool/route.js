@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readRepoFile, searchRepo, getRepoStructureJSON } from "@/lib/repoSearch";
+import { readRepoFile, searchRepo } from "@/lib/repoSearch";
 
 export const runtime = "nodejs";
 
@@ -68,7 +68,6 @@ export async function POST(request) {
   }
 
   const results = [];
-  let hadError = false;
 
   for (const toolCall of list) {
     const id = toolCall.id;
@@ -77,7 +76,6 @@ export async function POST(request) {
       const result = await handleTool(name, toolCall.arguments);
       results.push({ toolCallId: id, result });
     } catch (e) {
-      hadError = true;
       const errorMsg = `Error: ${e?.message || String(e)}`;
       console.error("[vapi-tool] Error in handleTool:", errorMsg);
       results.push({
@@ -87,41 +85,5 @@ export async function POST(request) {
     }
   }
 
-  // Fallback: If any errors occurred, add full repo structure as JSON
-  if (hadError) {
-    try {
-      const fallbackData = await getRepoStructureJSON();
-      results.push({
-        toolCallId: "fallback_repo_structure",
-        result: `Tool call failed. Here's the full repository structure as JSON:\n\n${fallbackData}`,
-      });
-    } catch (fallbackError) {
-      console.error("[vapi-tool] Fallback also failed:", fallbackError);
-    }
-  }
-
   return NextResponse.json({ results });
-}
-
-/**
- * GET endpoint to retrieve full repo structure as JSON
- * Useful for debugging or providing fallback data directly
- */
-export async function GET() {
-  try {
-    const repoJSON = await getRepoStructureJSON();
-    return new NextResponse(repoJSON, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  } catch (e) {
-    return NextResponse.json(
-      {
-        error: true,
-        message: `Failed to fetch repo structure: ${e?.message || String(e)}`,
-      },
-      { status: 500 }
-    );
-  }
 }
