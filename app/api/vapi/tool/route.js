@@ -104,24 +104,15 @@ export async function POST(request) {
 }
 
 /**
- * GET endpoint to retrieve full repo structure as JSON
- * Useful for debugging and testing
+ * GET endpoint - returns repo structure JSON for testing
  */
 export async function GET() {
   try {
-    const repoJSON = await getRepoStructureJSON();
-    return new NextResponse(repoJSON, {
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const json = await getRepoStructureJSON();
+    return new NextResponse(json, {
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
-    return NextResponse.json(
-      {
-        error: true,
-        message: `Failed to fetch repo structure: ${e?.message || String(e)}`,
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }

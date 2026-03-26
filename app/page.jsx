@@ -49,6 +49,7 @@ export default function Home() {
               role: "system",
               content: pendingContextMessageRef.current,
             },
+            triggerResponseEnabled: false,
           });
           pushLog("Injected repo context JSON into the call.");
         } catch (error) {
