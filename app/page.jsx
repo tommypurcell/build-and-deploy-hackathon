@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Vapi from "@vapi-ai/web";
 import { MarkdownNotes } from "@/app/components/MarkdownNotes";
-import { saveNote } from "@/lib/notesStorage";
+import { loadNote, saveNote } from "@/lib/notesStorage";
+import { clearSessions, loadSessions, upsertSession } from "@/lib/sessionArchive";
 
 function buildRepoContextSystemMessage(repoContextJson) {
   return [
@@ -27,6 +28,10 @@ export default function Home() {
   /** Merge multiple assistant "final" transcript chunks into one log + dialogue turn. */
   const assistantBufferRef = useRef("");
   const assistantDebounceRef = useRef(null);
+  const dialogueRef = useRef([]);
+  const logRef = useRef([]);
+  const repoUrlRef = useRef("");
+  const currentSessionRef = useRef(null);
 
   const [connected, setConnected] = useState(false);
   const [loadingContext, setLoadingContext] = useState(false);
@@ -40,11 +45,20 @@ export default function Home() {
   const [notesPreviewExpanded, setNotesPreviewExpanded] = useState(false);
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState("");
+  const [notesArchiveAvailable, setNotesArchiveAvailable] = useState(false);
+  const [animateNotes, setAnimateNotes] = useState(false);
+
+  const [sessions, setSessions] = useState([]);
 
   const [repoUrl, setRepoUrl] = useState("");
 
   const pushLog = useCallback((line) => {
-    setLog((prev) => [...prev.slice(-40), `${new Date().toLocaleTimeString()} ${line}`]);
+    const entry = `${new Date().toLocaleTimeString()} ${line}`;
+    setLog((prev) => {
+      const next = [...prev.slice(-40), entry];
+      logRef.current = next;
+      return next;
+    });
   }, []);
 
   const flushAssistantBuffer = useCallback(() => {
@@ -56,14 +70,41 @@ export default function Home() {
     assistantBufferRef.current = "";
     if (!full) return;
     pushLog(`assistant: ${full}`);
-    setDialogue((d) => [...d, { role: "assistant", text: full }]);
+    setDialogue((d) => {
+      const next = [...d, { role: "assistant", text: full }];
+      dialogueRef.current = next;
+      return next;
+    });
     lastTranscriptLogRef.current = { role: "assistant", text: full };
   }, [pushLog]);
+
+  const persistCurrentSession = useCallback((finalize = false) => {
+    const session = currentSessionRef.current;
+    if (!session?.startedAt) return;
+
+    // Keep refs as the source of truth so we can persist immediately on call-end.
+    session.dialogue = dialogueRef.current;
+    session.transcriptLog = logRef.current;
+    if (finalize && !session.endedAt) {
+      session.endedAt = Date.now();
+    }
+
+    upsertSession(session);
+    setSessions(loadSessions());
+  }, []);
 
   const vapi = useMemo(() => {
     if (!publicKey) return null;
     return new Vapi(publicKey);
   }, [publicKey]);
+
+  useEffect(() => {
+    repoUrlRef.current = repoUrl.trim();
+  }, [repoUrl]);
+
+  useEffect(() => {
+    setSessions(loadSessions());
+  }, []);
 
   useEffect(() => {
     if (!vapi) return;
@@ -77,13 +118,31 @@ export default function Home() {
         clearTimeout(assistantDebounceRef.current);
         assistantDebounceRef.current = null;
       }
+      const newSessionId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `session_${Date.now()}`;
+      currentSessionRef.current = {
+        id: newSessionId,
+        startedAt: Date.now(),
+        endedAt: null,
+        repoUrl: repoUrlRef.current,
+        dialogue: [],
+        transcriptLog: [],
+        notes: null,
+      };
       setDialogue([]);
+      dialogueRef.current = [];
+      setLog([]);
+      logRef.current = [];
       setNotesFullText("");
       setNotesDisplayText("");
       setNotesSessionId(null);
       setNotesTypingDone(false);
       setNotesPreviewExpanded(false);
       setNotesError("");
+      setNotesArchiveAvailable(false);
+      setAnimateNotes(false);
       pushLog("Call started - ask about this repo.");
       if (pendingContextMessageRef.current) {
         try {
@@ -107,6 +166,7 @@ export default function Home() {
       pendingContextMessageRef.current = "";
       lastTranscriptLogRef.current = { role: "", text: "" };
       pushLog("Call ended.");
+      persistCurrentSession(true);
     };
     const onSpeechEnd = () => {
       flushAssistantBuffer();
@@ -141,7 +201,11 @@ export default function Home() {
         }
         lastTranscriptLogRef.current = { role: "user", text };
         pushLog(`user: ${message.transcript}`);
-        setDialogue((d) => [...d, { role: "user", text }]);
+        setDialogue((d) => {
+          const next = [...d, { role: "user", text }];
+          dialogueRef.current = next;
+          return next;
+        });
       }
     };
     const onError = (e) => {
@@ -170,9 +234,10 @@ export default function Home() {
         /* ignore */
       }
     };
-  }, [vapi, pushLog, flushAssistantBuffer]);
+  }, [vapi, pushLog, flushAssistantBuffer, persistCurrentSession]);
 
   useEffect(() => {
+    if (!animateNotes) return;
     if (!notesFullText || !notesSessionId) {
       return;
     }
@@ -186,13 +251,14 @@ export default function Home() {
       if (i >= full.length) {
         setNotesDisplayText(full);
         setNotesTypingDone(true);
+        setAnimateNotes(false);
         clearInterval(timer);
         return;
       }
       setNotesDisplayText(full.slice(0, i));
     }, 14);
     return () => clearInterval(timer);
-  }, [notesFullText, notesSessionId]);
+  }, [notesFullText, notesSessionId, animateNotes]);
 
   const generateNotes = useCallback(async () => {
     if (dialogue.length === 0) {
@@ -201,6 +267,7 @@ export default function Home() {
     }
     setNotesLoading(true);
     setNotesError("");
+    setAnimateNotes(true);
     setNotesFullText("");
     setNotesDisplayText("");
     setNotesSessionId(null);
@@ -226,19 +293,31 @@ export default function Home() {
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
           : `note_${Date.now()}`;
+      const createdAt = new Date().toISOString();
       saveNote(id, {
         markdown: data.notes,
         repoUrl: repoUrl.trim(),
-        createdAt: new Date().toISOString(),
+        createdAt,
       });
       setNotesSessionId(id);
       setNotesFullText(data.notes);
+      setNotesArchiveAvailable(true);
+
+      if (currentSessionRef.current) {
+        currentSessionRef.current.notes = {
+          markdown: data.notes,
+          noteId: id,
+          createdAt,
+        };
+        currentSessionRef.current.repoUrl = repoUrl.trim();
+        persistCurrentSession(false);
+      }
     } catch (e) {
       setNotesError(e?.message || String(e));
     } finally {
       setNotesLoading(false);
     }
-  }, [dialogue, repoUrl]);
+  }, [dialogue, repoUrl, persistCurrentSession]);
 
   const fetchRepoContext = useCallback(async () => {
     const trimmedRepoUrl = repoUrl.trim();
@@ -315,9 +394,53 @@ export default function Home() {
 
   const ready = Boolean(publicKey && assistantId);
 
+  const restoreSession = useCallback(
+    (session) => {
+      if (!session) return;
+      const notes = session?.notes && typeof session.notes === "object" ? session.notes : null;
+      const notesMarkdown = typeof notes?.markdown === "string" ? notes.markdown : "";
+      const noteId = typeof notes?.noteId === "string" ? notes.noteId : null;
+
+      setAnimateNotes(false);
+      setNotesLoading(false);
+      setNotesError("");
+      setNotesPreviewExpanded(false);
+
+      const archiveAvailable = Boolean(noteId ? loadNote(noteId) : null);
+      setNotesArchiveAvailable(archiveAvailable);
+
+      setDialogue(session?.dialogue && Array.isArray(session.dialogue) ? session.dialogue : []);
+      dialogueRef.current =
+        session?.dialogue && Array.isArray(session.dialogue) ? session.dialogue : [];
+
+      setLog(
+        session?.transcriptLog && Array.isArray(session.transcriptLog) ? session.transcriptLog : [],
+      );
+      logRef.current =
+        session?.transcriptLog && Array.isArray(session.transcriptLog)
+          ? session.transcriptLog
+          : [];
+
+      if (notesMarkdown) {
+        setNotesSessionId(noteId || session.id || null);
+        setNotesFullText(notesMarkdown);
+        setNotesDisplayText(notesMarkdown);
+        setNotesTypingDone(true);
+      } else {
+        setNotesSessionId(null);
+        setNotesFullText("");
+        setNotesDisplayText("");
+        setNotesTypingDone(false);
+      }
+
+      setNotesLoading(false);
+    },
+    [],
+  );
+
   return (
-    <div className="min-h-full owen-shell text-zinc-900 dark:text-zinc-100">
-      <main className="mx-auto flex max-w-lg flex-col items-center px-6 py-16">
+    <div className="min-h-full owen-shell flex flex-col text-zinc-900 dark:text-zinc-100">
+      <main className="mx-auto flex max-w-lg flex-1 flex-col items-center px-6 py-16">
         <div className="owen-banner w-full px-6 py-10 text-center">
           <h1 className="pixel-title text-5xl">OWEN</h1>
         </div>
@@ -367,9 +490,11 @@ export default function Home() {
           <div className="relative z-[1] flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-teal-400/90">
-                OUT // GEMINI_NOTES
+                OUT // NOTES
               </p>
-              <h2 className="mt-1 text-xs font-medium text-zinc-300">Structured notes stream</h2>
+              <h2 className="mt-1 text-xs font-medium text-zinc-300">
+                Generate notes from transcript
+              </h2>
             </div>
             <button
               type="button"
@@ -377,7 +502,7 @@ export default function Home() {
               disabled={notesLoading || dialogue.length === 0}
               className="rounded-lg border border-teal-500/50 bg-teal-500/15 px-3 py-1.5 font-mono text-[11px] font-medium text-teal-100 transition hover:bg-teal-500/25 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {notesLoading ? "GENERATING…" : "GENERATE_FROM_TRANSCRIPT"}
+              {notesLoading ? "Generating…" : "Generate notes from transcript"}
             </button>
           </div>
           {notesError ? (
@@ -421,7 +546,7 @@ export default function Home() {
                     Collapse preview
                   </button>
                 ) : null}
-                {notesSessionId ? (
+                {notesArchiveAvailable ? (
                   <Link
                     href={`/notes/${notesSessionId}`}
                     className="inline-flex items-center rounded-md border border-cyan-500/40 bg-cyan-950/40 px-3 py-1.5 font-mono text-[11px] font-medium text-cyan-100 hover:bg-cyan-900/50"
@@ -456,6 +581,54 @@ export default function Home() {
           </ul>
         </div>
       </main>
+
+      <footer className="mt-auto w-full px-6 pb-4">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-center">
+          <div className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center backdrop-blur">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="font-mono text-[11px] text-zinc-500">
+                Stored sessions ({sessions.length})
+              </span>
+              {sessions.length === 0 ? (
+                <span className="font-mono text-[11px] text-zinc-500">none yet</span>
+              ) : (
+                sessions.slice(0, 6).map((s) => {
+                  const label = new Date(s.startedAt).toLocaleString([], {
+                    month: "numeric",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => restoreSession(s)}
+                      disabled={connected}
+                      className="font-mono text-[11px] text-teal-300/90 hover:text-teal-50 disabled:cursor-not-allowed disabled:opacity-60 underline decoration-teal-500/40"
+                    >
+                      {label}
+                    </button>
+                  );
+                })
+              )}
+              {sessions.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearSessions();
+                    setSessions([]);
+                  }}
+                  disabled={connected}
+                  className="font-mono text-[11px] text-zinc-400 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-60 underline decoration-white/20"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
