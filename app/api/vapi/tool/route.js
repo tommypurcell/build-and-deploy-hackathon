@@ -87,8 +87,10 @@ export async function POST(request) {
   for (const toolCall of list) {
     const id = toolCall.id;
     const name = toolCall.name;
+    console.log("[vapi-tool] Received tool call:", { id, name, args: toolCall.arguments });
     try {
       const result = await handleTool(name, toolCall.arguments, repoOptions);
+      console.log("[vapi-tool] Tool result for", name, ":", result?.substring?.(0, 100) || result);
       results.push({ toolCallId: id, result });
     } catch (e) {
       const errorMsg = `Error: ${e?.message || String(e)}`;
