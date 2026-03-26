@@ -15,16 +15,26 @@ function normalizeArgs(raw) {
   return raw;
 }
 
-function handleTool(name, args) {
+async function handleTool(name, args) {
   const a = normalizeArgs(args);
-  switch (name) {
-    case "search_repo":
-      return searchRepo(a.query);
-    case "read_repo_file":
-      return readRepoFile(a.path);
-    default:
-      return `Unknown tool: ${name}`;
+  const rawName = String(name || "");
+  const norm = rawName.trim().toLowerCase();
+  const normNoUnderscore = norm.replace(/_/g, "");
+
+  if (norm === "search_repo" || normNoUnderscore === "searchrepo") {
+    return await searchRepo(a.query);
   }
+
+  // Accept read_repo_file, readRepoFile, etc.
+  if (
+    norm === "read_repo_file" ||
+    normNoUnderscore === "readrepofile" ||
+    normNoUnderscore === "readrepofilepath"
+  ) {
+    return await readRepoFile(a.path);
+  }
+
+  return `Unknown tool: ${rawName}. I only support: search_repo(query) and read_repo_file(path).`;
 }
 
 /**
@@ -48,12 +58,21 @@ export async function POST(request) {
     );
   }
 
+  try {
+    console.log(
+      "[vapi-tool] toolCallList names:",
+      list.map((t) => t?.name).filter(Boolean),
+    );
+  } catch {
+    /* ignore logging */
+  }
+
   const results = [];
   for (const toolCall of list) {
     const id = toolCall.id;
     const name = toolCall.name;
     try {
-      const result = handleTool(name, toolCall.arguments);
+      const result = await handleTool(name, toolCall.arguments);
       results.push({ toolCallId: id, result });
     } catch (e) {
       results.push({
