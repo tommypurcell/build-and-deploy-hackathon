@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
+import { DevConsoleFilter } from "./components/DevConsoleFilter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,7 +29,10 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${pixelFont.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <DevConsoleFilter />
+        {children}
+      </body>
     </html>
   );
 }
