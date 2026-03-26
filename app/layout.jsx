@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 const pixelFont = Press_Start_2P({
-  weight: "400",
+  weight: ["400"],
   variable: "--font-pixel",
   subsets: ["latin"],
 });
