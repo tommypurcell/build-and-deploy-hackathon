@@ -22,9 +22,16 @@ export default function Home() {
 
   const vapiRef = useRef(null);
   const pendingContextMessageRef = useRef("");
+  /** Avoid duplicate log lines when Vapi emits the same final transcript twice. */
+  const lastTranscriptLogRef = useRef({ role: "", text: "" });
   const [connected, setConnected] = useState(false);
   const [loadingContext, setLoadingContext] = useState(false);
   const [log, setLog] = useState([]);
+  /** Final transcript turns only (for Gemini notes). Reset when a new call starts. */
+  const [dialogue, setDialogue] = useState([]);
+  const [notes, setNotes] = useState("");
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
 
   const pushLog = useCallback((line) => {
@@ -42,6 +49,10 @@ export default function Home() {
 
     const onStart = () => {
       setConnected(true);
+      lastTranscriptLogRef.current = { role: "", text: "" };
+      setDialogue([]);
+      setNotes("");
+      setNotesError("");
       pushLog("Call started - ask about this repo.");
       if (pendingContextMessageRef.current) {
         try {
@@ -62,11 +73,26 @@ export default function Home() {
     const onEnd = () => {
       setConnected(false);
       pendingContextMessageRef.current = "";
+      lastTranscriptLogRef.current = { role: "", text: "" };
       pushLog("Call ended.");
     };
     const onMessage = (message) => {
       if (message?.type === "transcript" && message.transcript) {
-        pushLog(`${message.role || "user"}: ${message.transcript}`);
+        // Vapi streams partial transcripts as the model refines text; logging each update looks like repetition.
+        // See ClientMessageTranscript.transcriptType in @vapi-ai/web (partial | final).
+        if (message.transcriptType === "partial") {
+          return;
+        }
+        const role = message.role || "user";
+        const text = String(message.transcript).trim();
+        if (!text) return;
+        const prev = lastTranscriptLogRef.current;
+        if (prev.role === role && prev.text === text) {
+          return;
+        }
+        lastTranscriptLogRef.current = { role, text };
+        pushLog(`${role}: ${message.transcript}`);
+        setDialogue((prev) => [...prev, { role, text }]);
       }
     };
     const onError = (e) => {
@@ -90,6 +116,38 @@ export default function Home() {
       }
     };
   }, [vapi, pushLog]);
+
+  const generateNotes = useCallback(async () => {
+    if (dialogue.length === 0) {
+      setNotesError("No transcript yet. Finish a voice turn or end the call, then try again.");
+      return;
+    }
+    setNotesLoading(true);
+    setNotesError("");
+    setNotes("");
+    try {
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dialogue,
+          repoUrl: repoUrl.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || `Request failed (${response.status})`);
+      }
+      if (!data.notes) {
+        throw new Error("No notes in response.");
+      }
+      setNotes(data.notes);
+    } catch (e) {
+      setNotesError(e?.message || String(e));
+    } finally {
+      setNotesLoading(false);
+    }
+  }, [dialogue, repoUrl]);
 
   const fetchRepoContext = useCallback(async () => {
     const trimmedRepoUrl = repoUrl.trim();
@@ -212,6 +270,43 @@ export default function Home() {
                 ? "Loading repo context..."
                 : "Start voice session"}
           </button>
+        </div>
+
+        <div className="mt-6 w-full owen-card rounded-xl p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Structured notes (Gemini)
+            </h2>
+            <button
+              type="button"
+              onClick={generateNotes}
+              disabled={notesLoading || dialogue.length === 0}
+              className="rounded-lg border border-teal-600/40 bg-teal-600/10 px-3 py-1.5 text-xs font-medium text-teal-800 transition hover:bg-teal-600/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-teal-200"
+            >
+              {notesLoading ? "Generating…" : "Generate notes from transcript"}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Uses your final voice lines from this session. Set{" "}
+            <code className="font-mono text-[11px]">GEMINI_API_KEY</code> in{" "}
+            <code className="font-mono text-[11px]">.env</code> (server only).
+          </p>
+          {notesError ? (
+            <p className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+              {notesError}
+            </p>
+          ) : null}
+          {notes ? (
+            <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-white/40 bg-white/70 p-3 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-100">
+              <pre className="whitespace-pre-wrap font-sans text-[13px]">{notes}</pre>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-zinc-400">
+              {dialogue.length === 0
+                ? "Notes appear after you speak with OWEN during a session."
+                : "Click generate to turn the transcript into Markdown notes."}
+            </p>
+          )}
         </div>
 
         <div className="mt-6 w-full owen-card rounded-xl p-5">
