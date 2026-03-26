@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readRepoFile, searchRepo } from "@/lib/repoSearch";
+import { readRepoFile, searchRepo, getRepoStructureJSON } from "@/lib/repoSearch";
 
 export const runtime = "nodejs";
 
@@ -15,14 +15,28 @@ function normalizeArgs(raw) {
   return raw;
 }
 
-async function handleTool(name, args) {
+function getRepoOptions(body) {
+  const candidates = [
+    body?.message?.artifact?.variableValues?.repoUrl,
+    body?.message?.call?.artifact?.variableValues?.repoUrl,
+    body?.message?.call?.assistantOverrides?.variableValues?.repoUrl,
+  ];
+
+  const repoUrl = candidates.find(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+
+  return repoUrl ? { repoUrl } : {};
+}
+
+async function handleTool(name, args, repoOptions) {
   const a = normalizeArgs(args);
   const rawName = String(name || "");
   const norm = rawName.trim().toLowerCase();
   const normNoUnderscore = norm.replace(/_/g, "");
 
   if (norm === "search_repo" || normNoUnderscore === "searchrepo") {
-    return await searchRepo(a.query);
+    return await searchRepo(a.query, repoOptions);
   }
 
   // Accept read_repo_file, readRepoFile, etc.
@@ -31,7 +45,7 @@ async function handleTool(name, args) {
     normNoUnderscore === "readrepofile" ||
     normNoUnderscore === "readrepofilepath"
   ) {
-    return await readRepoFile(a.path);
+    return await readRepoFile(a.path, repoOptions);
   }
 
   return `Unknown tool: ${rawName}. I only support: search_repo(query) and read_repo_file(path).`;
@@ -51,6 +65,7 @@ export async function POST(request) {
 
   const message = body?.message;
   const list = message?.toolCallList;
+  const repoOptions = getRepoOptions(body);
   if (!Array.isArray(list)) {
     return NextResponse.json(
       { error: "Expected message.toolCallList array" },
@@ -73,7 +88,7 @@ export async function POST(request) {
     const id = toolCall.id;
     const name = toolCall.name;
     try {
-      const result = await handleTool(name, toolCall.arguments);
+      const result = await handleTool(name, toolCall.arguments, repoOptions);
       results.push({ toolCallId: id, result });
     } catch (e) {
       const errorMsg = `Error: ${e?.message || String(e)}`;
@@ -86,4 +101,27 @@ export async function POST(request) {
   }
 
   return NextResponse.json({ results });
+}
+
+/**
+ * GET endpoint to retrieve full repo structure as JSON
+ * Useful for debugging and testing
+ */
+export async function GET() {
+  try {
+    const repoJSON = await getRepoStructureJSON();
+    return new NextResponse(repoJSON, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error: true,
+        message: `Failed to fetch repo structure: ${e?.message || String(e)}`,
+      },
+      { status: 500 }
+    );
+  }
 }
