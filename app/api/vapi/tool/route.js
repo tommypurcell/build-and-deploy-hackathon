@@ -100,6 +100,17 @@ export async function POST(request) {
     }
   }
 
+  // ALWAYS add repo context JSON as an additional result for the assistant
+  try {
+    const repoJson = await getRepoStructureJSON(repoOptions);
+    results.push({
+      toolCallId: "repo_context",
+      result: `Repository context (always available):\n\n${repoJson}`,
+    });
+  } catch (e) {
+    console.error("[vapi-tool] Failed to add repo context:", e);
+  }
+
   return NextResponse.json({ results });
 }
 
